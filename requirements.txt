@@ -1,3 +1,7 @@
 Scrapy>=2.9.0
 pytest
+beautifulsoup4
+networkx
+matplotlib
+pyvis
 
