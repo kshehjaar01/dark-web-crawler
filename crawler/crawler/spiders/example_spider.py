@@ -1,28 +1,46 @@
-import logging
-from scrapy import signals
-from scrapy.downloadermiddlewares.retry import RetryMiddleware
-from scrapy.utils.response import response_status_message
+import scrapy
+from urllib.parse import urljoin, urlparse
+from w3lib.url import canonicalize_url
 
-logger = logging.getLogger(__name__)
+class ExampleSpider(scrapy.Spider):
+    name = "example"
+    allowed_domains = ["example.com"]
+    start_urls = ["https://example.com/"]
 
-class ErrorLoggingMiddleware(RetryMiddleware):
-    """
-    Extends Scrapy's RetryMiddleware to log errors to a file via spider.logger
-    """
-    def __init__(self, settings):
-        super().__init__(settings)
-        self.max_retry_times = settings.getint('RETRY_TIMES', 3)
+    custom_settings = {
+        "CLOSESPIDER_PAGECOUNT": 200  # safety limit per run
+    }
 
-    @classmethod
-    def from_crawler(cls, crawler):
-        return cls(crawler.settings)
+    def parse(self, response):
+        # raw_html used for fingerprinting
+        raw_html = response.text
 
-    def process_response(self, request, response, spider):
-        # If response status is 4xx/5xx, log it
-        if response.status >= 400:
-            spider.logger.warning("HTTP %s on %s", response.status, response.url)
-        return super().process_response(request, response, spider)
+        # extract links (absolute)
+        links = []
+        for href in response.css("a::attr(href)").getall():
+            href = href.strip()
+            if not href:
+                continue
+            absolute = urljoin(response.url, href)
+            parsed = urlparse(absolute)
+            # Only http(s) links
+            if parsed.scheme in ("http", "https"):
+                # optionally canonicalize to reduce duplicates
+                absolute = canonicalize_url(absolute)
+                links.append(absolute)
 
-    def process_exception(self, request, exception, spider):
-        spider.logger.error("Exception for %s: %s", request.url, exception)
-        return super().process_exception(request, exception, spider)
+        item = {
+            "url": response.url,
+            "raw_html": raw_html,
+            "links": links,
+        }
+
+        # yield item for pipelines (structured data extraction, fingerprinting, graph, output)
+        yield item
+
+        # Follow same-domain links
+        for link in links:
+            parsed = urlparse(link)
+            # strict domain check: endswith allowed domain
+            if any(parsed.netloc.endswith(d) for d in self.allowed_domains):
+                yield scrapy.Request(url=link, callback=self.parse)
