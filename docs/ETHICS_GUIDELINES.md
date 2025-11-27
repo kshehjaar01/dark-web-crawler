@@ -26,3 +26,18 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
+# Ethics & legal checklist (must read)
+
+Before running this crawler against any target, ensure you have:
+
+- ✅ **Explicit permission** from the target owner when required.
+- ✅ **Reviewed robots.txt** and complied with any disallow rules.
+- ✅ **Confirmed compliance** with relevant laws (data protection, privacy, computer misuse).
+- ✅ **Minimized data retention**: collect only necessary data; do not store sensitive PII.
+- ✅ **Research approvals** (IRB/ethics committee) if data involves human subjects.
+- ✅ **Rate-limiting and safety**: use DOWNLOAD_DELAY, AUTOTHROTTLE, and low concurrency.
+- ✅ **Contact information** in your User-Agent string so admins can reach you.
+- ✅ **A plan for takedown requests** and prompt removal of data if requested.
+- ✅ **Logging & monitoring** to detect unintended heavy load or errors.
+
+If you are unsure about legality for a target, seek legal advice or avoid crawling it.
