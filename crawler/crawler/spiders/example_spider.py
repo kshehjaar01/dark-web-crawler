@@ -1,36 +1,28 @@
-import scrapy
-from crawler.items import PageItem
-from urllib.parse import urljoin, urlparse
+import logging
+from scrapy import signals
+from scrapy.downloadermiddlewares.retry import RetryMiddleware
+from scrapy.utils.response import response_status_message
 
-class ExampleSpider(scrapy.Spider):
-    name = "example"
-    allowed_domains = ["example.com"]
-    start_urls = ["https://example.com/"]
+logger = logging.getLogger(__name__)
 
-    custom_settings = {
-        "CLOSESPIDER_PAGECOUNT": 50  # safety: stop after limited pages
-    }
+class ErrorLoggingMiddleware(RetryMiddleware):
+    """
+    Extends Scrapy's RetryMiddleware to log errors to a file via spider.logger
+    """
+    def __init__(self, settings):
+        super().__init__(settings)
+        self.max_retry_times = settings.getint('RETRY_TIMES', 3)
 
-    def parse(self, response):
-        item = PageItem()
-        item["url"] = response.url
-        item["title"] = response.xpath("//title/text()").get(default="").strip()
-        links = []
-        for href in response.css("a::attr(href)").getall():
-            href = href.strip()
-            if not href:
-                continue
-            absolute = urljoin(response.url, href)
-            parsed = urlparse(absolute)
-            # Only include http[s] links
-            if parsed.scheme in ("http", "https"):
-                links.append(absolute)
-        item["links"] = links
-        yield item
+    @classmethod
+    def from_crawler(cls, crawler):
+        return cls(crawler.settings)
 
-        # follow links within allowed domains only
-        for link in links:
-            parsed = urlparse(link)
-            if parsed.netloc.endswith("example.com"):
-                yield response.follow(link, callback=self.parse)
+    def process_response(self, request, response, spider):
+        # If response status is 4xx/5xx, log it
+        if response.status >= 400:
+            spider.logger.warning("HTTP %s on %s", response.status, response.url)
+        return super().process_response(request, response, spider)
 
+    def process_exception(self, request, exception, spider):
+        spider.logger.error("Exception for %s: %s", request.url, exception)
+        return super().process_exception(request, exception, spider)
